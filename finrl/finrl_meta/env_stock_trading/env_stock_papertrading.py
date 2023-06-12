@@ -11,8 +11,8 @@ import gym
 class AlpacaPaperTrading():
 
     def __init__(self,ticker_list, time_interval, drl_lib, agent, cwd, net_dim, 
-                 state_dim, action_dim, API_KEY, API_SECRET, 
-                 API_BASE_URL, tech_indicator_list, turbulence_thresh=30, 
+                 API_KEY, API_SECRET, API_BASE_URL, tech_indicator_list, 
+                 state_dim=None, action_dim=None, turbulence_thresh=30, 
                  max_stock=1e2, latency = None):
         #load agent
         self.drl_lib = drl_lib
@@ -172,7 +172,7 @@ class AlpacaPaperTrading():
             time.sleep(self.time_interval)
             
     def awaitMarketOpen(self):
-        isOpen = self.alpaca.get_clock().is_open
+        isOpen = True #self.alpaca.get_clock().is_open
         while(not isOpen):
           clock = self.alpaca.get_clock()
           openingTime = clock.next_open.replace(tzinfo=datetime.timezone.utc).timestamp()
@@ -203,9 +203,11 @@ class AlpacaPaperTrading():
             raise ValueError('The DRL library input is NOT supported yet. Please check your input.')
         
         self.stocks_cd += 1
+        print(f"ACTION: {action}")
         if self.turbulence_bool == 0:
-            min_action = 10  # stock_cd
+            min_action = 0.9  # stock_cd
             for index in np.where(action < -min_action)[0]:  # sell_index:
+                
                 sell_num_shares = min(self.stocks[index], -action[index])
                 qty =  abs(int(sell_num_shares))
                 respSO = []
@@ -264,10 +266,8 @@ class AlpacaPaperTrading():
         cash = float(self.alpaca.get_account().cash)
         self.cash = cash
         self.stocks = stocks
-        self.turbulence_bool = turbulence_bool 
+        self.turbulence_bool = turbulence_bool
         self.price = price
-        
-        
         
         amount = np.array(self.cash * (2 ** -12), dtype=np.float32)
         scale = np.array(2 ** -6, dtype=np.float32)
@@ -279,7 +279,7 @@ class AlpacaPaperTrading():
                     self.stocks_cd,
                     tech,
                     )).astype(np.float32)
-        print(len(self.stockUniverse))
+        
         return state
         
     def submitOrder(self, qty, stock, side, resp):
