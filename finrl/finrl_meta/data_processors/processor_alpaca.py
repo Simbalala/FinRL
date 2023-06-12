@@ -7,7 +7,7 @@ import time
 import itertools
 import exchange_calendars as tc
 from stockstats import StockDataFrame as Sdf
-from lib.preprocessor.preprocessors import FeatureEngineer
+from finrl.finrl_meta.preprocessor.preprocessors import FeatureEngineer
 
 
 class AlpacaProcessor:
