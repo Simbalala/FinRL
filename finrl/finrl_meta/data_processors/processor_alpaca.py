@@ -1,9 +1,13 @@
+import logging
 import alpaca_trade_api as tradeapi
 import numpy as np
 import pandas as pd
 import pytz
+import time
+import itertools
 import exchange_calendars as tc
 from stockstats import StockDataFrame as Sdf
+from lib.preprocessor.preprocessors import FeatureEngineer
 
 
 class AlpacaProcessor:
@@ -24,32 +28,40 @@ class AlpacaProcessor:
         self.end = end_date
         self.time_interval = time_interval
 
-        NY = "America/New_York"
-        start_date = pd.Timestamp(start_date, tz=NY)
-        end_date = pd.Timestamp(end_date, tz=NY) + pd.Timedelta(days=1)
+        EP = "Europe/Paris"
+        start_date = pd.Timestamp(start_date, tz=EP)
+        end_date = pd.Timestamp(end_date, tz=EP) + pd.Timedelta(days=1)
         date = start_date
         data_df = pd.DataFrame()
-        while date != end_date:
-            start_time = (date + pd.Timedelta("09:30:00")).isoformat()
-            end_time = (date + pd.Timedelta("15:59:00")).isoformat()
+        if (time_interval == '1Day' or time_interval == '1Min'):
             for tic in ticker_list:
                 barset = self.api.get_bars(
-                    tic, time_interval, start=start_time, end=end_time, limit=500
+                    tic, time_interval, start=start_date.isoformat(), end=end_date.isoformat()
                 ).df
                 barset["tic"] = tic
                 barset = barset.reset_index()
                 data_df = data_df.append(barset)
-            print(("Data before ") + end_time + " is successfully fetched")
-            # print(data_df.head())
-            date = date + pd.Timedelta(days=1)
-            if date.isoformat()[-14:-6] == "01:00:00":
-                date = date - pd.Timedelta("01:00:00")
-            elif date.isoformat()[-14:-6] == "23:00:00":
-                date = date + pd.Timedelta("01:00:00")
-            if date.isoformat()[-14:-6] != "00:00:00":
-                raise ValueError("Timezone Error")
-
-        data_df['timestamp'] = data_df['timestamp'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
+        else:
+            while date != end_date:
+                start_time = (date + pd.Timedelta("09:30:00")).isoformat()
+                end_time = (date + pd.Timedelta("15:59:00")).isoformat()
+                for tic in ticker_list:
+                    barset = self.api.get_bars(
+                        tic, time_interval, start=start_time, end=end_time, limit=500
+                    ).df
+                    barset["tic"] = tic
+                    barset = barset.reset_index()
+                    data_df = data_df.append(barset)
+                print(("Data before ") + end_time + " is successfully fetched")
+                # print(data_df.head())
+                date = date + pd.Timedelta(days=1)
+                if date.isoformat()[-14:-6] == "01:00:00":
+                    date = date - pd.Timedelta("01:00:00")
+                elif date.isoformat()[-14:-6] == "23:00:00":
+                    date = date + pd.Timedelta("01:00:00")
+                if date.isoformat()[-14:-6] != "00:00:00":
+                    raise ValueError("Timezone Error")
+            data_df['timestamp'] = data_df['timestamp'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
 
         return data_df
 
@@ -147,9 +159,10 @@ class AlpacaProcessor:
                 temp_indicator = pd.DataFrame(temp_indicator)
                 temp_indicator["tic"] = unique_ticker[i]
                 # print(len(df[df.tic == unique_ticker[i]]['date'].to_list()))
-                temp_indicator["date"] = df[df.tic == unique_ticker[i]][
-                    "date"
-                ].to_list()
+                temp_indicator["date"] = df[df.tic == unique_ticker[i]]["date"].dt.tz_convert("America/New_York")
+                # temp_indicator["date"] = df[df.tic == unique_ticker[i]][
+                #     "date"
+                # ].to_list()
                 indicator_df = indicator_df.append(temp_indicator, ignore_index=True)
             df = df.merge(
                 indicator_df[["tic", "date", indicator]], on=["tic", "date"], how="left"
@@ -239,7 +252,7 @@ class AlpacaProcessor:
                 price_array = df[df.tic == tic][["close"]].values
                 tech_array = df[df.tic == tic][tech_indicator_list].values
                 if if_vix:
-                    turbulence_array = df[df.tic == tic]["VIXY"].values
+                    turbulence_array = df[df.tic == tic]["vix"].values
                 else:
                     turbulence_array = df[df.tic == tic]["turbulence"].values
                 if_first_time = False
@@ -253,10 +266,39 @@ class AlpacaProcessor:
         print("Successfully transformed into array")
         return price_array, tech_array, turbulence_array
 
+    def df_to_array2(self, df, tech_indicator_list, if_vix):
+        df = df.copy()
+        unique_ticker = df.tic.unique()
+        if_first_time = True
+        price_array = []
+        tech_array = []
+        turbulence_array = []
+        
+        for tic in unique_ticker:
+            price_data = df[df.tic == tic][["close"]].values
+            tech_data = df[df.tic == tic][tech_indicator_list].values
+            if if_vix:
+                turbulence_data = df[df.tic == tic]["vix"].values
+            else:
+                turbulence_data = df[df.tic == tic]["turbulence"].values
+            
+            if if_first_time:
+                price_array = price_data
+                tech_array = tech_data
+                turbulence_array = turbulence_data
+                if_first_time = False
+            else:
+                price_array = np.concatenate([price_array, price_data], axis=0)
+                tech_array = np.concatenate([tech_array, tech_data], axis=0)
+                turbulence_array = np.concatenate((turbulence_array, turbulence_data), axis=0)
+        print("Successfully transformed into arrays")
+        print(f"Price A: {price_array.shape}")
+        return price_array, tech_array, turbulence_array
+
     def get_trading_days(self, start, end):
         nyse = tc.get_calendar("NYSE")
         df = nyse.sessions_in_range(
-            pd.Timestamp(start, tz=pytz.UTC), pd.Timestamp(end, tz=pytz.UTC)
+            pd.Timestamp(start), pd.Timestamp(end)
         )
         trading_days = []
         for day in df:
@@ -267,78 +309,53 @@ class AlpacaProcessor:
     def fetch_latest_data(
         self, ticker_list, time_interval, tech_indicator_list, limit=100
     ) -> pd.DataFrame:
-
         data_df = pd.DataFrame()
         for tic in ticker_list:
-            barset = self.api.get_bars([tic], time_interval, limit=limit).df#[tic]
+            barset = self.api.get_bars(tic, time_interval, limit=limit).df#[tic]
             barset["tic"] = tic
             barset = barset.reset_index()
             data_df = data_df.append(barset)
-
+        if data_df.empty:
+            raise ValueError('The Dataframe is empty. Stock market are close maybe. Please check api.')
+        # if data_df.shape[0] != data_df.shape[1]:
+        #     raise ValueError('One or many stock frame are empty dataframe aren\'t square (x, x)')
         data_df = data_df.reset_index(drop=True)
         start_time = data_df.timestamp.min()
         end_time = data_df.timestamp.max()
         times = []
         current_time = start_time
         end = end_time + pd.Timedelta(minutes=1)
+
         while current_time != end:
             times.append(current_time)
             current_time += pd.Timedelta(minutes=1)
 
         df = data_df.copy()
-        new_df = pd.DataFrame()
-        for tic in ticker_list:
-            tmp_df = pd.DataFrame(
-                columns=["open", "high", "low", "close", "volume"], index=times
-            )
-            tic_df = df[df.tic == tic]
-            for i in range(tic_df.shape[0]):
-                tmp_df.loc[tic_df.iloc[i]["timestamp"]] = tic_df.iloc[i][
-                    ["open", "high", "low", "close", "volume"]
-                ]
 
+        fe = FeatureEngineer(use_technical_indicator=True,
+                     tech_indicator_list = tech_indicator_list,
+                     use_vix=True,
+                     use_turbulence=False,
+                     user_defined_feature = False,
+                     api = self.api)
 
-                if str(tmp_df.iloc[0]["close"]) == "nan":
-                    for i in range(tmp_df.shape[0]):
-                        if str(tmp_df.iloc[i]["close"]) != "nan":
-                            first_valid_close = tmp_df.iloc[i]["close"]
-                            tmp_df.iloc[0] = [
-                                first_valid_close,
-                                first_valid_close,
-                                first_valid_close,
-                                first_valid_close,
-                                0.0,
-                            ]
-                            break
-                if str(tmp_df.iloc[0]["close"]) == "nan":
-                    print('Missing data for ticker: ', tic, ' . The prices are all NaN. Fill with 0.')
-                    tmp_df.iloc[0] = [0.0, 0.0, 0.0, 0.0, 0.0,]
+        df = df.reset_index().rename(columns={"timestamp": "date"})
+        common_columns = ['date', 'open', 'high', 'low', 'close', 'volume', 'tic']
+        df = df.loc[:, common_columns]
+        processed = fe.preprocess_data(df)
 
+        list_ticker = processed["tic"].unique().tolist()
+        list_date = list(pd.date_range(processed['date'].min(),processed['date'].max(), freq="1min"))
+        combination = list(itertools.product(list_date, list_ticker))
+        processed_full = pd.DataFrame(combination,columns=["date","tic"]).merge(processed,on=["date","tic"],how="left")
 
-            for i in range(tmp_df.shape[0]):
-                if str(tmp_df.iloc[i]["close"]) == "nan":
-                    previous_close = tmp_df.iloc[i - 1]["close"]
-                    if str(previous_close) == "nan":
-                        raise ValueError
-                    tmp_df.iloc[i] = [
-                        previous_close,
-                        previous_close,
-                        previous_close,
-                        previous_close,
-                        0.0,
-                    ]
-            tmp_df = tmp_df.astype(float)
-            tmp_df["tic"] = tic
-            new_df = new_df.append(tmp_df)
+        processed_full = processed_full.sort_values(['date', 'tic']).reset_index(drop=True)
+        processed_full = processed_full.fillna(0)
 
-        new_df = new_df.reset_index()
-        new_df = new_df.rename(columns={"index": "timestamp"})
-
-        df = self.add_technical_indicator(new_df, tech_indicator_list)
-        df["VIXY"] = 0
-
+        # df = self.add_technical_indicator(new_df, tech_indicator_list)
+        processed_full["vix"] = 0
         price_array, tech_array, turbulence_array = self.df_to_array(
-            df, tech_indicator_list, if_vix=True
+            processed_full, tech_indicator_list, if_vix=True
         )
         latest_price = price_array[-1]
         latest_tech = tech_array[-1]
