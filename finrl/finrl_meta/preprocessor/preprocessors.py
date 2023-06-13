@@ -63,25 +63,31 @@ class FeatureEngineer:
         use_vix=False,
         use_turbulence=False,
         user_defined_feature=False,
+        time_interval='1Min',
+        api=None
+
     ):
         self.use_technical_indicator = use_technical_indicator
         self.tech_indicator_list = tech_indicator_list
         self.use_vix = use_vix
         self.use_turbulence = use_turbulence
         self.user_defined_feature = user_defined_feature
+        self.time_interval = time_interval
+        self.api = api
 
-    def preprocess_data(self, df):
+    def preprocess_data(self, df) -> pd.DataFrame: 
         """main method to do the feature engineering
         @:param config: source dataframe
         @:return: a DataMatrices object
         """
         # clean data
         df = self.clean_data(df)
-
+       
         # add technical indicators using stockstats
         if self.use_technical_indicator:
             df = self.add_technical_indicator(df)
             print("Successfully added technical indicators")
+
 
         # add vix for multiple stock
         if self.use_vix:
@@ -92,7 +98,7 @@ class FeatureEngineer:
         if self.use_turbulence:
             df = self.add_turbulence(df)
             print("Successfully added turbulence index")
-
+       
         # add user defined feature
         if self.user_defined_feature:
             df = self.add_user_defined_feature(df)
@@ -114,19 +120,10 @@ class FeatureEngineer:
         df = df.sort_values(["date", "tic"], ignore_index=True)
         df.index = df.date.factorize()[0]
         merged_closes = df.pivot_table(index="date", columns="tic", values="close")
-        merged_closes = merged_closes.dropna(axis=1)
+        # merged_closes = merged_closes.dropna(axis=1)
         tics = merged_closes.columns
         df = df[df.tic.isin(tics)]
-        # df = data.copy()
-        # list_ticker = df["tic"].unique().tolist()
-        # only apply to daily level data, need to fix for minute level
-        # list_date = list(pd.date_range(df['date'].min(),df['date'].max()).astype(str))
-        # combination = list(itertools.product(list_date,list_ticker))
-
-        # df_full = pd.DataFrame(combination,columns=["date","tic"]).merge(df,on=["date","tic"],how="left")
-        # df_full = df_full[df_full['date'].isin(df['date'])]
-        # df_full = df_full.sort_values(['date','tic'])
-        # df_full = df_full.fillna(0)
+        
         return df
 
     def add_technical_indicator(self, data):
@@ -161,9 +158,6 @@ class FeatureEngineer:
             )
         df = df.sort_values(by=["date", "tic"])
         return df
-        # df = data.set_index(['date','tic']).sort_index()
-        # df = df.join(df.groupby(level=0, group_keys=False).apply(lambda x, y: Sdf.retype(x)[y], y=self.tech_indicator_list))
-        # return df.reset_index()
 
     def add_user_defined_feature(self, data):
         """
@@ -186,9 +180,12 @@ class FeatureEngineer:
         :return: (df) pandas dataframe
         """
         df = data.copy()
-        df_vix = YahooDownloader(
-            start_date=df.date.min(), end_date=df.date.max(), ticker_list=["^VIX"]
-        ).fetch_data()
+        df_vix = self.api.get_bars(
+                ["VIXY"], self.time_interval, start=df.date.min().isoformat(), end=df.date.max().isoformat()
+            ).df
+        df_vix["tic"] = "VIXY"
+
+        df_vix = df_vix.reset_index().rename(columns={"timestamp": "date"})
         vix = df_vix[["date", "close"]]
         vix.columns = ["date", "vix"]
 
@@ -217,6 +214,7 @@ class FeatureEngineer:
         df_price_pivot = df_price_pivot.pct_change()
 
         unique_date = df.date.unique()
+        
         # start after a year
         start = 252
         turbulence_index = [0] * start
@@ -254,7 +252,6 @@ class FeatureEngineer:
             else:
                 turbulence_temp = 0
             turbulence_index.append(turbulence_temp)
-
         turbulence_index = pd.DataFrame(
             {"date": df_price_pivot.index, "turbulence": turbulence_index}
         )
