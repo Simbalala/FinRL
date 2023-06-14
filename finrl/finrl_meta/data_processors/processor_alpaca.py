@@ -315,6 +315,7 @@ class AlpacaProcessor:
             barset["tic"] = tic
             barset = barset.reset_index()
             data_df = data_df.append(barset)
+
         if data_df.empty:
             raise ValueError('The Dataframe is empty. Stock market are close maybe. Please check api.')
         # if data_df.shape[0] != data_df.shape[1]:
@@ -344,13 +345,12 @@ class AlpacaProcessor:
         df = df.loc[:, common_columns]
         processed = fe.preprocess_data(df)
 
-        list_ticker = processed["tic"].unique().tolist()
         list_date = list(pd.date_range(processed['date'].min(),processed['date'].max(), freq="1min"))
-        combination = list(itertools.product(list_date, list_ticker))
-        processed_full = pd.DataFrame(combination,columns=["date","tic"]).merge(processed,on=["date","tic"],how="left")
-
-        processed_full = processed_full.sort_values(['date', 'tic']).reset_index(drop=True)
+        combination = list(itertools.product(list_date, ticker_list))
+        processed_full = pd.DataFrame(combination, columns=["date","tic"]).merge(processed,on=["date","tic"],how="left")
+        processed_full = processed_full.sort_values(['date', 'tic']).reset_index(drop=True)        
         processed_full = processed_full.fillna(0)
+        
 
         # df = self.add_technical_indicator(new_df, tech_indicator_list)
         processed_full["vix"] = 0
