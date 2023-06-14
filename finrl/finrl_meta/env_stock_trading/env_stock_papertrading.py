@@ -172,7 +172,7 @@ class AlpacaPaperTrading():
             time.sleep(self.time_interval)
             
     def awaitMarketOpen(self):
-        isOpen = True #self.alpaca.get_clock().is_open
+        isOpen = self.alpaca.get_clock().is_open
         while(not isOpen):
           clock = self.alpaca.get_clock()
           openingTime = clock.next_open.replace(tzinfo=datetime.timezone.utc).timestamp()

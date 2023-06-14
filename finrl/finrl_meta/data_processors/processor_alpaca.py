@@ -266,35 +266,6 @@ class AlpacaProcessor:
         print("Successfully transformed into array")
         return price_array, tech_array, turbulence_array
 
-    def df_to_array2(self, df, tech_indicator_list, if_vix):
-        df = df.copy()
-        unique_ticker = df.tic.unique()
-        if_first_time = True
-        price_array = []
-        tech_array = []
-        turbulence_array = []
-        
-        for tic in unique_ticker:
-            price_data = df[df.tic == tic][["close"]].values
-            tech_data = df[df.tic == tic][tech_indicator_list].values
-            if if_vix:
-                turbulence_data = df[df.tic == tic]["vix"].values
-            else:
-                turbulence_data = df[df.tic == tic]["turbulence"].values
-            
-            if if_first_time:
-                price_array = price_data
-                tech_array = tech_data
-                turbulence_array = turbulence_data
-                if_first_time = False
-            else:
-                price_array = np.concatenate([price_array, price_data], axis=0)
-                tech_array = np.concatenate([tech_array, tech_data], axis=0)
-                turbulence_array = np.concatenate((turbulence_array, turbulence_data), axis=0)
-        print("Successfully transformed into arrays")
-        print(f"Price A: {price_array.shape}")
-        return price_array, tech_array, turbulence_array
-
     def get_trading_days(self, start, end):
         nyse = tc.get_calendar("NYSE")
         df = nyse.sessions_in_range(
