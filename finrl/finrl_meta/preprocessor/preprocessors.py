@@ -1,7 +1,7 @@
 import datetime
 
 import numpy as np
-import pandas as pd
+import modin.pandas as pd
 from finrl import config
 from finrl.finrl_meta.preprocessor.yahoodownloader import YahooDownloader
 from stockstats import StockDataFrame as Sdf
@@ -135,7 +135,7 @@ class FeatureEngineer:
         """
         df = data.copy()
         df = df.sort_values(by=["tic", "date"])
-        stock = Sdf.retype(df.copy())
+        stock = Sdf.retype(df.copy()._to_pandas())
         unique_ticker = stock.tic.unique()
 
         for indicator in self.tech_indicator_list:
@@ -145,6 +145,7 @@ class FeatureEngineer:
                     temp_indicator = stock[stock.tic == unique_ticker[i]][indicator]
                     temp_indicator = pd.DataFrame(temp_indicator)
                     temp_indicator["tic"] = unique_ticker[i]
+                    
                     temp_indicator["date"] = df[df.tic == unique_ticker[i]][
                         "date"
                     ].to_list()
@@ -188,6 +189,7 @@ class FeatureEngineer:
         df_vix = df_vix.reset_index().rename(columns={"timestamp": "date"})
         vix = df_vix[["date", "close"]]
         vix.columns = ["date", "vix"]
+        vix = pd.DataFrame(vix)
 
         df = df.merge(vix, on="date")
         df = df.sort_values(["date", "tic"]).reset_index(drop=True)
