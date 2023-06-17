@@ -3,7 +3,7 @@ import threading
 from finrl.finrl_meta.data_processors.processor_alpaca import AlpacaProcessor
 import alpaca_trade_api as tradeapi
 import time
-import modin.pandas as pd
+import pandas as pd
 import numpy as np
 import torch
 import gym

@@ -1,7 +1,7 @@
 import datetime
 
 import numpy as np
-import modin.pandas as pd
+import pandas as pd
 from finrl import config
 from finrl.finrl_meta.preprocessor.yahoodownloader import YahooDownloader
 from stockstats import StockDataFrame as Sdf
@@ -189,7 +189,6 @@ class FeatureEngineer:
         df_vix = df_vix.reset_index().rename(columns={"timestamp": "date"})
         vix = df_vix[["date", "close"]]
         vix.columns = ["date", "vix"]
-        vix = pd.DataFrame(vix)
 
         df = df.merge(vix, on="date")
         df = df.sort_values(["date", "tic"]).reset_index(drop=True)
