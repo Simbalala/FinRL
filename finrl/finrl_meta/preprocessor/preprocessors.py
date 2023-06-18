@@ -135,7 +135,7 @@ class FeatureEngineer:
         """
         df = data.copy()
         df = df.sort_values(by=["tic", "date"])
-        stock = Sdf.retype(df.copy()._to_pandas())
+        stock = Sdf.retype(df.copy())
         unique_ticker = stock.tic.unique()
 
         for indicator in self.tech_indicator_list:
