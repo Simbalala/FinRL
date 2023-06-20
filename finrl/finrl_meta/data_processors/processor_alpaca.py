@@ -247,6 +247,8 @@ class AlpacaProcessor:
         df = df.copy()
         unique_ticker = df.tic.unique()
         if_first_time = True
+        if len(unique_ticker) == 0:
+            raise ValueError('Unique Ticker list was empty. Please check data source.')
         for tic in unique_ticker:
             if if_first_time:
                 price_array = df[df.tic == tic][["close"]].values
