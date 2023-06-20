@@ -141,7 +141,7 @@ class AlpacaPaperTrading():
           if(self.timeToClose < (60)):
             # Close all positions when 1 minutes til market close.
             print("Market closing soon. Stop trading.")
-            # break
+            break
             
             '''# Close all positions when 1 minutes til market close.
             print("Market closing soon.  Closing positions.")
