@@ -140,10 +140,6 @@ class AlpacaPaperTrading():
     
           if(self.timeToClose < (60)):
             # Close all positions when 1 minutes til market close.
-            print("Market closing soon. Stop trading.")
-            break
-            
-            '''# Close all positions when 1 minutes til market close.
             print("Market closing soon.  Closing positions.")
     
             positions = self.alpaca.list_positions()
@@ -160,7 +156,7 @@ class AlpacaPaperTrading():
     
             # Run script again after market close for next trading day.
             print("Sleeping until market close (15 minutes).")
-            time.sleep(60 * 15)'''
+            time.sleep(60 * 15)
             
           else:
             trade = threading.Thread(target=self.trade)
