@@ -4,7 +4,7 @@ ccxt==1.67.1  # make sure that >=1.66.32
 numpy>=1.17.3
 pandas==1.5.3
 # modin[all]==0.22.2
-stockstats>=0.4.0
+stockstats==0.5.4
 yfinance
 elegantrl==0.3.5
 #pyfolio
