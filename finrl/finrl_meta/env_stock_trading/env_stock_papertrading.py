@@ -138,7 +138,7 @@ class AlpacaPaperTrading():
           currTime = clock.timestamp.replace(tzinfo=datetime.timezone.utc).timestamp()
           self.timeToClose = closingTime - currTime
     
-          if(self.timeToClose < (60)):
+          if(self.timeToClose < (60)) or self.stopProfitDay():
             # Close all positions when 1 minutes til market close.
             print("Market closing soon.  Closing positions.")
     
@@ -167,6 +167,12 @@ class AlpacaPaperTrading():
             cur_time = time.time()
             self.equities.append([cur_time,last_equity])
             time.sleep(self.time_interval)
+    
+    def stopProfitDay(self):
+        protfolio_history = self.alpaca.get_portfolio_history()
+        if protfolio_history.df.profit_loss_pct.to_list()[-1] > 0.0008:
+            return True
+        return False
             
     def awaitMarketOpen(self):
         isOpen = self.alpaca.get_clock().is_open
